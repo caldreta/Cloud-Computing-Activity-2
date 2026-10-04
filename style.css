@@ -1,0 +1,757 @@
+/* ============================================================
+   TOKENS
+   ============================================================ */
+:root {
+    /* base palette */
+    --obsidian:     #0d1122;
+    --obsidian-lift:#151b31;
+    --panel:        #1a2140;
+    --hairline:     #2b3458;
+    --parchment:    #e9e3d3;
+    --muted:        #8d97b4;
+    --gold:         #c9a24b;
+    --jade:         #4fc3a1;
+
+    /* region accents (same language as the character archive) */
+    --region-ionia:     #7fd8c2;
+    --region-noxus:     #c2453d;
+    --region-freljord:  #79b6e8;
+    --region-targon:    #d8b25e;
+    --region-shurima:   #e0a94b;
+    --region-void:      #a367d6;
+    --region-zaun:      #8cc63f;
+    --region-bandle:    #f0a6c8;
+    --region-default:   #c9a24b;
+
+    --accent: var(--region-default);
+
+    /* type */
+    --display: "Cinzel", Georgia, serif;
+    --body: "Barlow", system-ui, sans-serif;
+
+    --measure: 40rem;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background:
+        radial-gradient(90rem 45rem at 50% -18rem, #1d2547 0%, transparent 65%),
+        var(--obsidian);
+    background-attachment: fixed;
+    color: var(--parchment);
+    font-family: var(--body);
+    font-size: 17px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+    outline: 2px solid var(--jade);
+    outline-offset: 3px;
+}
+
+
+/* ============================================================
+   SHELL
+   ============================================================ */
+.rite {
+    width: min(100% - 2.5rem, var(--measure));
+    margin: 0 auto;
+    padding: 4.5rem 0 6rem;
+}
+
+.masthead {
+    border-bottom: 1px solid var(--hairline);
+    padding-bottom: 2rem;
+    margin-bottom: 3rem;
+}
+
+.masthead h1 {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: clamp(1.85rem, 5.5vw, 2.7rem);
+    line-height: 1.15;
+    letter-spacing: 0.005em;
+    margin: 0 0 0.75rem;
+}
+
+.standfirst {
+    margin: 0;
+    max-width: 32rem;
+    color: var(--muted);
+    font-size: 1.02rem;
+}
+
+.stage-center {
+    text-align: center;
+}
+
+
+/* ============================================================
+   PROGRESS
+   ============================================================ */
+.progress {
+    display: flex;
+    gap: 0.55rem;
+    margin-bottom: 2rem;
+}
+
+.progress i {
+    width: 0.6rem;
+    height: 0.6rem;
+    transform: rotate(45deg);
+    border: 1px solid var(--hairline);
+    background: transparent;
+    transition: background 0.25s ease, border-color 0.25s ease;
+}
+
+.progress i.done {
+    background: var(--gold);
+    border-color: var(--gold);
+}
+
+.progress i.active {
+    border-color: var(--parchment);
+    background: var(--parchment);
+}
+
+
+/* ============================================================
+   QUESTION
+   ============================================================ */
+.step-count {
+    margin: 0 0 0.4rem;
+    color: var(--muted);
+    font-size: 0.86rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.question {
+    font-family: var(--display);
+    font-weight: 500;
+    font-size: clamp(1.35rem, 4vw, 1.8rem);
+    line-height: 1.25;
+    margin: 0 0 0.5rem;
+}
+
+.question-note {
+    margin: 0 0 2rem;
+    color: var(--muted);
+    font-size: 0.97rem;
+    max-width: 30rem;
+}
+
+
+/* ============================================================
+   ANSWER PLATES
+   ============================================================ */
+.answers {
+    display: grid;
+    gap: 0.6rem;
+}
+
+.plate {
+    display: grid;
+    grid-template-columns: 2.4rem 1fr;
+    align-items: baseline;
+    gap: 0 1rem;
+    width: 100%;
+    text-align: left;
+    padding: 1rem 1.2rem;
+    background: var(--obsidian-lift);
+    border: 1px solid var(--hairline);
+    border-left: 3px solid var(--hairline);
+    color: inherit;
+    font-family: inherit;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: border-left-color 0.18s ease, background 0.18s ease,
+                transform 0.18s ease;
+}
+
+.plate:hover,
+.plate:focus-visible {
+    background: var(--panel);
+    border-left-color: var(--gold);
+    transform: translateX(3px);
+}
+
+.plate .glyph {
+    grid-row: 1 / 3;
+    align-self: center;
+    font-family: var(--display);
+    font-size: 1.15rem;
+    color: var(--gold);
+    text-align: center;
+}
+
+.plate .plate-label {
+    font-weight: 600;
+    letter-spacing: 0.01em;
+}
+
+.plate .plate-sub {
+    grid-column: 2;
+    color: var(--muted);
+    font-size: 0.9rem;
+    line-height: 1.4;
+    margin-top: 0.15rem;
+}
+
+.plate.plate-skip {
+    background: transparent;
+    border-style: dashed;
+    border-left-width: 1px;
+    border-left-style: dashed;
+}
+
+.plate.plate-skip .glyph { color: var(--muted); }
+.plate.plate-skip .plate-label { font-weight: 400; color: var(--muted); }
+
+.back {
+    margin-top: 1.75rem;
+    padding: 0;
+    background: none;
+    border: none;
+    border-bottom: 1px solid var(--hairline);
+    color: var(--muted);
+    font-family: inherit;
+    font-size: 0.92rem;
+    cursor: pointer;
+}
+
+.back:hover { color: var(--parchment); border-bottom-color: var(--parchment); }
+
+
+/* ============================================================
+   LOADING
+   ============================================================ */
+.loading-text {
+    font-family: var(--display);
+    font-size: 1.2rem;
+    color: var(--muted);
+    margin: 3rem 0 1.25rem;
+}
+
+.loading-runes {
+    display: flex;
+    justify-content: center;
+    gap: 0.6rem;
+}
+
+.loading-runes i {
+    width: 0.5rem;
+    height: 0.5rem;
+    transform: rotate(45deg);
+    background: var(--gold);
+    opacity: 0.25;
+    animation: pulse 1.1s ease-in-out infinite;
+}
+
+.loading-runes i:nth-child(2) { animation-delay: 0.16s; }
+.loading-runes i:nth-child(3) { animation-delay: 0.32s; }
+
+@keyframes pulse {
+    0%, 100% { opacity: 0.2; }
+    50%      { opacity: 1; }
+}
+
+
+/* ============================================================
+   THE REVEAL  —  the one loud moment on the page
+   ============================================================ */
+.reveal {
+    --accent: var(--region-default);
+    position: relative;
+    padding-top: 0.5rem;
+}
+
+.reveal-top {
+    display: grid;
+    grid-template-columns: 11rem 1fr;
+    gap: 1.75rem;
+    align-items: end;
+    margin-bottom: 1.75rem;
+}
+
+.portrait {
+    position: relative;
+    aspect-ratio: 3 / 4;
+    overflow: hidden;
+    background: var(--obsidian-lift);
+    border: 1px solid var(--hairline);
+    box-shadow: 0 0 0 1px var(--obsidian), 0 0 3.5rem -0.75rem var(--accent);
+}
+
+.portrait img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    filter: saturate(1.05) contrast(1.05);
+}
+
+.portrait::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(13, 17, 34, 0.85), transparent 55%);
+}
+
+.match {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    margin-bottom: 0.4rem;
+}
+
+.match-figure {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: clamp(3.2rem, 13vw, 5rem);
+    line-height: 0.85;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+}
+
+.match-label {
+    color: var(--muted);
+    font-size: 0.95rem;
+}
+
+.champion-name {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: clamp(1.6rem, 6vw, 2.35rem);
+    line-height: 1.05;
+    margin: 0.4rem 0 0.2rem;
+}
+
+.champion-title {
+    margin: 0;
+    color: var(--muted);
+    font-style: italic;
+    font-size: 1.03rem;
+}
+
+.traits {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin-bottom: 1.75rem;
+}
+
+.trait {
+    padding: 0.28rem 0.7rem;
+    border: 1px solid var(--hairline);
+    font-size: 0.85rem;
+    color: var(--parchment);
+    background: var(--obsidian-lift);
+}
+
+.trait-accent {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.reasons {
+    list-style: none;
+    margin: 0 0 1.75rem;
+    padding: 0;
+    border-top: 1px solid var(--hairline);
+}
+
+.reasons li {
+    padding: 0.7rem 0 0.7rem 1.4rem;
+    border-bottom: 1px solid var(--hairline);
+    position: relative;
+    font-size: 0.97rem;
+}
+
+.reasons li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 1.15rem;
+    width: 0.4rem;
+    height: 0.4rem;
+    transform: rotate(45deg);
+    background: var(--accent);
+}
+
+.reasons li.reasons-empty::before { background: var(--muted); }
+
+.blurb {
+    margin: 0 0 0.9rem;
+    color: #cfd4e4;
+    font-size: 0.99rem;
+}
+
+.blurb-heading {
+    font-family: var(--display);
+    font-weight: 500;
+    font-size: 1.05rem;
+    margin: 0 0 0.5rem;
+}
+
+
+/* ============================================================
+   ALTERNATES
+   ============================================================ */
+.alternates {
+    margin-top: 2.75rem;
+    border-top: 1px solid var(--hairline);
+    padding-top: 1.25rem;
+}
+
+.alternates-heading {
+    font-family: var(--display);
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--muted);
+    margin: 0 0 0.9rem;
+}
+
+.alt {
+    display: grid;
+    grid-template-columns: 3.2rem 1fr auto;
+    align-items: center;
+    gap: 1rem;
+    width: 100%;
+    padding: 0.7rem 0.8rem 0.7rem 0;
+    background: none;
+    border: none;
+    border-bottom: 1px solid var(--hairline);
+    color: inherit;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.18s ease;
+}
+
+.alt:hover, .alt:focus-visible { background: var(--obsidian-lift); }
+
+.alt-thumb {
+    width: 3.2rem;
+    height: 3.2rem;
+    object-fit: cover;
+    background: var(--obsidian-lift);
+    border: 1px solid var(--hairline);
+}
+
+.alt-name {
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.alt-meta {
+    color: var(--muted);
+    font-size: 0.88rem;
+}
+
+.alt-score {
+    font-family: var(--display);
+    font-size: 1.15rem;
+    color: var(--gold);
+    font-variant-numeric: tabular-nums;
+}
+
+
+/* ============================================================
+   ACTIONS
+   ============================================================ */
+.result-actions {
+    margin-top: 2.5rem;
+}
+
+.restart {
+    padding: 0.8rem 1.6rem;
+    background: transparent;
+    border: 1px solid var(--gold);
+    color: var(--gold);
+    font-family: var(--display);
+    font-size: 0.98rem;
+    cursor: pointer;
+    transition: background 0.18s ease, color 0.18s ease;
+}
+
+.restart:hover, .restart:focus-visible {
+    background: var(--gold);
+    color: var(--obsidian);
+}
+
+
+/* ============================================================
+   MOTION  —  one orchestrated reveal, nothing else
+   ============================================================ */
+@keyframes rise {
+    from { opacity: 0; transform: translateY(0.9rem); }
+    to   { opacity: 1; transform: none; }
+}
+
+.reveal .reveal-top   { animation: rise 0.5s ease both; }
+.reveal .traits       { animation: rise 0.5s 0.09s ease both; }
+.reveal .reasons      { animation: rise 0.5s 0.18s ease both; }
+.reveal .reveal-lore  { animation: rise 0.5s 0.27s ease both; }
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+    .plate:hover { transform: none; }
+}
+
+
+/* ============================================================
+   NARROW SCREENS
+   ============================================================ */
+@media (max-width: 34rem) {
+    .rite { padding-top: 3rem; }
+
+    .reveal-top {
+        grid-template-columns: 1fr;
+        gap: 1.25rem;
+        align-items: start;
+    }
+
+    .portrait { width: 9.5rem; }
+
+    .plate { grid-template-columns: 1.9rem 1fr; padding: 0.9rem 1rem; }
+}
+
+
+/* ============================================================
+   HOME  --  the roster, wider than the quiz column
+   ============================================================ */
+.rite[data-stage="home"] {
+    width: min(100% - 2.5rem, 64rem);
+}
+
+.home-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.75rem 1.25rem;
+    margin-bottom: 2rem;
+}
+
+.home-actions-end {
+    margin: 3.5rem 0 0;
+}
+
+.home-hint {
+    color: var(--muted);
+    font-size: 0.92rem;
+}
+
+.cta {
+    padding: 0.85rem 1.9rem;
+    background: var(--gold);
+    border: 1px solid var(--gold);
+    color: var(--obsidian);
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background 0.18s ease, color 0.18s ease;
+}
+
+.cta:hover,
+.cta:focus-visible {
+    background: transparent;
+    color: var(--gold);
+}
+
+
+/* group-by switch */
+.groupbar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 2.25rem;
+    padding-bottom: 1.1rem;
+    border-bottom: 1px solid var(--hairline);
+}
+
+.groupbar-label {
+    margin-right: 0.35rem;
+    color: var(--muted);
+    font-size: 0.9rem;
+}
+
+.group-btn {
+    padding: 0.4rem 1rem;
+    background: transparent;
+    border: 1px solid var(--hairline);
+    color: var(--muted);
+    font-family: inherit;
+    font-size: 0.93rem;
+    cursor: pointer;
+    transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.group-btn:hover {
+    color: var(--parchment);
+    border-color: var(--muted);
+}
+
+.group-btn[aria-pressed="true"] {
+    background: var(--parchment);
+    border-color: var(--parchment);
+    color: var(--obsidian);
+}
+
+
+/* groups and cards */
+.roster-status {
+    margin: 2rem 0;
+    color: var(--muted);
+}
+
+.roster-group + .roster-group {
+    margin-top: 2.9rem;
+}
+
+.roster-group-title {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    margin: 0 0 1rem;
+    font-family: var(--display);
+    font-weight: 500;
+    font-size: 1.3rem;
+}
+
+.roster-group-title .count {
+    color: var(--muted);
+    font-family: var(--body);
+    font-size: 0.88rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.roster-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 18.5rem), 1fr));
+    gap: 0.85rem;
+}
+
+.roster-card {
+    --accent: var(--region-default);
+    display: grid;
+    grid-template-columns: 4.5rem 1fr;
+    align-items: center;
+    gap: 0.85rem 1rem;
+    padding: 0.9rem;
+    background: var(--obsidian-lift);
+    border: 1px solid var(--hairline);
+    border-left: 3px solid var(--accent);
+}
+
+.roster-thumb {
+    width: 4.5rem;
+    height: 4.5rem;
+    object-fit: cover;
+    background: var(--panel);
+    border: 1px solid var(--hairline);
+}
+
+.roster-name {
+    margin: 0;
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: 1.12rem;
+    line-height: 1.15;
+}
+
+.roster-title {
+    margin: 0.2rem 0 0;
+    color: var(--muted);
+    font-style: italic;
+    font-size: 0.88rem;
+}
+
+.roster-facts {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.6rem 0.9rem;
+    margin: 0;
+    padding-top: 0.8rem;
+    border-top: 1px solid var(--hairline);
+}
+
+.roster-facts dt {
+    margin-bottom: 0.1rem;
+    color: var(--muted);
+    font-size: 0.76rem;
+}
+
+.roster-facts dd {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    font-size: 0.93rem;
+}
+
+.pips {
+    display: inline-flex;
+    gap: 0.24rem;
+}
+
+.pips i {
+    width: 0.42rem;
+    height: 0.42rem;
+    transform: rotate(45deg);
+    border: 1px solid var(--hairline);
+}
+
+.pips i.on {
+    background: var(--accent);
+    border-color: var(--accent);
+}
+
+
+/* ============================================================
+   RESULT: fallback notice and the two buttons
+   ============================================================ */
+.notice {
+    margin: 0 0 1.75rem;
+    padding: 0.85rem 1rem;
+    background: var(--obsidian-lift);
+    border-left: 3px solid var(--gold);
+    font-size: 0.97rem;
+}
+
+.result-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1.25rem 1.75rem;
+}
+
+.result-actions .back {
+    margin-top: 0;
+}
+
+
+/* ============================================================
+   MATCH PERCENT, AND TWO LISTS UNDER THE RESULT
+   ============================================================ */
+.match-figure .pct {
+    margin-left: 0.06em;
+    font-size: 0.45em;
+}
+
+.alt + .alternates-heading {
+    margin-top: 1.9rem;
+}

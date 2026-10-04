@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Which champion should you play?</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=Barlow:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <main class="rite" id="rite" data-stage="home">
+
+        <header class="masthead">
+            <h1>Which champion should you play?</h1>
+            <p class="standfirst" id="standfirst">
+                Look over the roster, then answer a short quiz about how you like
+                to fight. We read the archive and name the champions that fit.
+            </p>
+        </header>
+
+
+        <!-- HOME: THE ROSTER -->
+        <section class="stage" id="homeStage">
+
+            <p class="notice" id="dataWarning" hidden></p>
+
+            <div class="home-actions">
+                <button class="cta" data-action="start-quiz">Find my champion</button>
+                <span class="home-hint" id="quizMeta"></span>
+            </div>
+
+            <div class="groupbar" id="groupBar" role="group" aria-label="Group the roster by">
+                <span class="groupbar-label">Group by</span>
+                <button class="group-btn" data-group="role" aria-pressed="true">Role</button>
+                <button class="group-btn" data-group="playstyle" aria-pressed="false">Playstyle</button>
+                <button class="group-btn" data-group="difficulty" aria-pressed="false">Difficulty</button>
+            </div>
+
+            <div id="roster">
+                <p class="roster-status">Reading the archive</p>
+            </div>
+
+            <div class="home-actions home-actions-end">
+                <button class="cta" data-action="start-quiz">Find my champion</button>
+            </div>
+
+        </section>
+
+
+        <!-- QUIZ -->
+        <section class="stage" id="quizStage" hidden>
+
+            <div class="progress" id="progress" aria-hidden="true"></div>
+
+            <p class="step-count" id="stepCount"></p>
+            <h2 class="question" id="questionText"></h2>
+            <p class="question-note" id="questionNote"></p>
+
+            <div class="answers" id="answers"></div>
+
+            <button class="back" id="backBtn">Back to the roster</button>
+
+        </section>
+
+
+        <!-- LOADING -->
+        <section class="stage stage-center" id="loadingStage" hidden>
+            <p class="loading-text">Reading the archive</p>
+            <div class="loading-runes"><i></i><i></i><i></i></div>
+        </section>
+
+
+        <!-- RESULT -->
+        <section class="stage" id="resultStage" hidden>
+
+            <p class="notice" id="notice" hidden>
+                Your answers pull in different directions, so no champion reached
+                its bar. These three came closest, but none is a full match.
+            </p>
+
+            <article class="reveal" id="reveal"></article>
+
+            <div class="alternates" id="alternates"></div>
+
+            <div class="result-actions">
+                <button class="restart" id="restartBtn">Answer again</button>
+                <button class="back" id="homeBtn">Back to the roster</button>
+            </div>
+
+        </section>
+
+
+        <!-- ERROR -->
+        <section class="stage stage-center" id="errorStage" hidden>
+            <h2 class="question">The archive did not answer</h2>
+            <p class="question-note" id="errorText"></p>
+            <button class="restart" id="retryBtn">Try again</button>
+        </section>
+
+    </main>
+
+    <script src="app.js"></script>
+</body>
+</html>
