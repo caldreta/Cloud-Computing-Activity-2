@@ -28,7 +28,7 @@ const QUESTIONS = [
     {
         id: "brag",
         field: "playstyle",
-        points: 20,
+        points: 18,
         text: "Which fight would you be proudest of winning?",
         note: "This one counts for the most, so there is no skipping it.",
         options: [
@@ -43,7 +43,7 @@ const QUESTIONS = [
     {
         id: "role",
         field: "role",
-        points: 16,
+        points: 14,
         text: "If you were given the option to pick a role, which one is your go-to?",
         note: "",
         options: [
@@ -59,7 +59,7 @@ const QUESTIONS = [
     {
         id: "floor",
         field: "skill_floor",
-        points: 6,
+        points: 5,
         text: "How much practice are you willing to put in before a new champion feels comfortable?",
         note: "Skill floor is how hard a champion is to play at a basic level. 1 is the easiest start.",
         options: [
@@ -74,7 +74,7 @@ const QUESTIONS = [
     {
         id: "ceiling",
         field: "skill_ceiling",
-        points: 6,
+        points: 5,
         text: "How much room to grow do you want?",
         note: "Skill ceiling is how much skill a champion can use at the very top. 5 is the most.",
         options: [
@@ -89,7 +89,7 @@ const QUESTIONS = [
     {
         id: "range",
         field: "attack_type",
-        points: 10,
+        points: 9,
         text: "When you're just trading basic attacks, where do you want to be standing?",
         note: "",
         options: [
@@ -99,9 +99,33 @@ const QUESTIONS = [
         ]
     },
     {
+        id: "attack",
+        field: "damage_source",
+        points: 7,
+        text: "What do you want to deal most of your damage with?",
+        note: "",
+        options: [
+            { label: "Abilities", sub: "My abilities are my main damage, and basic attacks fill the gaps.", value: "Abilities" },
+            { label: "Basic attacks", sub: "Attacking is my main damage, and abilities help me hit harder.", value: "Auto-Attacks" },
+            SKIP
+        ]
+    },
+    {
+        id: "damage",
+        field: "damage_type",
+        points: 7,
+        text: "What kind of damage do you want to deal?",
+        note: "AD is attack damage, which armor reduces. AP is ability power, which magic resist reduces.",
+        options: [
+            { label: "Physical damage (AD)", sub: "Scales with attack damage items.", value: "AD" },
+            { label: "Magic damage (AP)", sub: "Scales with ability power items.", value: "AP" },
+            SKIP
+        ]
+    },
+    {
         id: "move",
         field: "mobility",
-        points: 6,
+        points: 5,
         text: "How much do you want to move around during a fight?",
         note: "",
         options: [
@@ -114,7 +138,7 @@ const QUESTIONS = [
     {
         id: "survive",
         field: "survivability",
-        points: 6,
+        points: 5,
         text: "How do you want to survive a fight?",
         note: "",
         options: [
@@ -127,7 +151,7 @@ const QUESTIONS = [
     {
         id: "aim",
         field: "mechanical_demand",
-        points: 6,
+        points: 5,
         text: "When you use an ability, how do you want it to land?",
         note: "",
         options: [
@@ -140,7 +164,7 @@ const QUESTIONS = [
     {
         id: "synergy",
         field: "kit_complexity",
-        points: 6,
+        points: 5,
         text: "How should a champion's abilities work together?",
         note: "",
         options: [
@@ -153,7 +177,7 @@ const QUESTIONS = [
     {
         id: "curve",
         field: "power_curve",
-        points: 6,
+        points: 5,
         text: "Which trade-off would you rather live with?",
         note: "",
         options: [
@@ -166,7 +190,7 @@ const QUESTIONS = [
     {
         id: "snowball",
         field: "snowball_dependence",
-        points: 6,
+        points: 5,
         text: "How should being ahead or behind change your champion?",
         note: "",
         options: [
@@ -179,7 +203,7 @@ const QUESTIONS = [
     {
         id: "alone",
         field: "team_dependence",
-        points: 6,
+        points: 5,
         text: "How long can your champion last without their team?",
         note: "",
         options: [
@@ -234,6 +258,12 @@ const FIELDS = {
     // Used by the roster page only. Skill floor and ceiling replaced it in the quiz.
     difficulty:          { type: "ordinal", levels: ["Easy", "Medium", "Hard"] },
     attack_type:         { type: "nominal" },
+    // Both are scales so that a champion who mixes the two is not scored as a
+    // total miss: "Mixed" sits between AD and AP, "Both" between the other two.
+    // Nobody has to use "Mixed" or "Both". With only the end values they act
+    // like plain either/or fields.
+    damage_type:         { type: "ordinal", levels: ["AD", "Mixed", "AP"] },
+    damage_source:       { type: "ordinal", levels: ["Abilities", "Both", "Auto-Attacks"] },
     mobility:            { type: "ordinal", levels: ["Low", "Medium", "High"] },
     survivability:       { type: "ordinal", levels: ["Squishy", "Sturdy", "Sustain-heavy"] },
     mechanical_demand:   { type: "ordinal", levels: ["Auto-Attack Based", "Point-and-Click", "Aimed Skillshots"] },
@@ -294,6 +324,16 @@ const REASONS = {
     attack_type: {
         Melee:  "Closes in to fight with basic attacks.",
         Ranged: "Fights from a distance with basic attacks."
+    },
+    damage_type: {
+        AD:    "Deals physical damage, scaling with attack damage.",
+        Mixed: "Deals a mix of physical and magic damage.",
+        AP:    "Deals magic damage, scaling with ability power."
+    },
+    damage_source: {
+        "Abilities":    "Deals most of its damage with abilities.",
+        "Both":         "Mixes basic attacks and abilities for its damage.",
+        "Auto-Attacks": "Deals most of its damage with basic attacks."
     },
     mobility: {
         High:   "Has dashes and jumps to chase, dodge and reposition freely.",
