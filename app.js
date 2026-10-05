@@ -32,11 +32,11 @@ const QUESTIONS = [
         text: "Which fight would you be proudest of winning?",
         note: "This one counts for the most, so there is no skipping it.",
         options: [
-            { label: "Killing the most dangerous enemy before they can react", sub: "One combo, then you're gone.", value: "Burst" },
+            { label: "Deleting a target with one explosive combo", sub: "Huge damage in two seconds, then the fight is over.", value: "Burst" },
             { label: "Outlasting everyone in a long fight", sub: "You keep fighting while they wear down.", value: "Sustained" },
             { label: "Wearing them down without ever being in danger", sub: "Damage from a safe distance.", value: "Poke" },
             { label: "Taking the hits so my team can win", sub: "You walk in first and hold the line.", value: "Frontline" },
-            { label: "Catching them off guard from out of sight", sub: "You choose the moment the fight starts.", value: "Ambush" },
+            { label: "Never being seen until the moment I strike", sub: "You wait out of sight and choose when the fight starts.", value: "Ambush" },
             { label: "Winning because of the plays I set up", sub: "Your team's kills start with you.", value: "Utility" }
         ]
     },
@@ -261,6 +261,12 @@ const MAX_RESULTS = 3;
 // them for real matches. Set it to 1 to show real matches only.
 const MIN_LIST_SIZE = 3;
 
+// Champions with near-identical tags score almost the same, so one cluster of
+// look-alikes can fill the whole list. With this on, the real matches after
+// the #1 pick are taken from other playstyles first, and look-alikes of the
+// #1 only fill what is left. Set it to false for a plain ranking.
+const SPREAD_BY_PLAYSTYLE = true;
+
 // One line per field value, shown when a champion matches that answer.
 const REASONS = {
     playstyle: {
@@ -327,6 +333,15 @@ const REASONS = {
 };
 
 
+// Playstyles that are close cousins. Burst is how fast the damage lands and
+// Ambush is how the fight starts, so one assassin can honestly be both, and a
+// player who picks one should not score the other as a total miss. Each pair
+// earns this fraction of the playstyle points. Keys are the two names in
+// alphabetical order, joined with "|".
+const PLAYSTYLE_NEIGHBOURS = {
+    "Ambush|Burst": 0.5
+};
+
 // Roles are stored as text like "Tank / Fighter". The first one listed
 // is the champion's main job, the rest are things it can also do.
 function roleCredit(characterRole, wantedRole) {
@@ -362,6 +377,10 @@ function closeness(field, character, clicked) {
         const over = rule.type === "atMost" ? a - b : b - a;
         if (over <= 0) return 1;
         return Math.max(0, 1 - over / (rule.levels.length - 1));
+    }
+
+    if (field === "playstyle" && actual !== clicked) {
+        return PLAYSTYLE_NEIGHBOURS[[actual, clicked].sort().join("|")] || 0;
     }
 
     return actual === clicked ? 1 : 0;
@@ -897,7 +916,18 @@ async function finish() {
         await ensureRoster();
 
         const ranked = rankCharacters(allCharacters, answers);
-        const matches = ranked.filter((c) => c.qualifies).slice(0, MAX_RESULTS);
+        let real = ranked.filter((c) => c.qualifies);
+
+        if (SPREAD_BY_PLAYSTYLE && real.length > 1) {
+            const [best, ...others] = real;
+            real = [
+                best,
+                ...others.filter((c) => c.playstyle !== best.playstyle),
+                ...others.filter((c) => c.playstyle === best.playstyle)
+            ];
+        }
+
+        const matches = real.slice(0, MAX_RESULTS);
 
         // Too few real matches to fill the list? Add the next closest.
         const fill = ranked
