@@ -7,6 +7,10 @@ const FETCH_OPTIONS = {
     }
 };
 
+// Champion pictures live in a public Supabase Storage bucket. The API sends the path inside it
+// (for example league/zed.jpg), and this is the address that path is added to.
+const IMAGE_BASE = "https://rmyhndpralukuvynsnbp.supabase.co/storage/v1/object/public/champion-images/";
+
 // When true, the console shows every champion's points and bar after each
 // quiz, and the calibrated bars when the roster loads. Handy for tuning.
 const DEBUG = false;
@@ -785,7 +789,7 @@ function pips(field, value) {
 
 function rosterCard(character) {
     const image = character.image
-        ? `<img class="roster-thumb" src="images/${escapeHtml(character.image)}" alt="">`
+        ? `<img class="roster-thumb" src="${IMAGE_BASE}${escapeHtml(character.image)}" alt="">`
         : `<div class="roster-thumb"></div>`;
 
     return `
@@ -1021,7 +1025,7 @@ function renderResult(index) {
         value === undefined ? "" : `<span class="trait">${label} ${escapeHtml(value)} of 5</span>`;
 
     const portrait = character.image
-        ? `<img src="images/${escapeHtml(character.image)}" alt="${escapeHtml(character.name)}">`
+        ? `<img src="${IMAGE_BASE}${escapeHtml(character.image)}" alt="${escapeHtml(character.name)}">`
         : "";
 
     const reasons = character.reasons.length
@@ -1077,7 +1081,7 @@ function renderAlternates(shownIndex) {
 
     const row = ({ character, i }) => `
         <button class="alt" data-index="${i}">
-            <img class="alt-thumb" src="images/${escapeHtml(character.image)}" alt="">
+            <img class="alt-thumb" src="${IMAGE_BASE}${escapeHtml(character.image)}" alt="">
             <span>
                 <span class="alt-name">${escapeHtml(character.name)}</span><br>
                 <span class="alt-meta">${escapeHtml(character.playstyle)} &middot; ${escapeHtml(character.role)}</span>
