@@ -50,12 +50,44 @@
                 <span class="home-hint" id="quizMeta"></span>
             </div>
 
+            <!-- SEARCH, FILTERS AND SORTING -->
+            <section class="tools" aria-label="Search, filter and sort the roster">
+                <div class="tools-row">
+                    <label class="search-field">
+                        <span class="sr-only">Search the roster</span>
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l5 5"/></svg>
+                        <input type="search" id="rosterSearch" placeholder="Search name, region or faction..." autocomplete="off" spellcheck="false">
+                    </label>
+                    <button type="button" class="tool-btn" id="filterToggle" aria-expanded="false" aria-controls="filterPanel">
+                        Filters <span class="tool-badge" id="filterBadge" hidden>0</span>
+                    </button>
+                    <label class="sort">
+                        <span class="sr-only">Sort champions</span>
+                        <select id="rosterSort">
+                            <option value="name">Sort: Name (A to Z)</option>
+                            <option value="name-desc">Sort: Name (Z to A)</option>
+                            <option value="easiest">Sort: Easiest first</option>
+                            <option value="hardest">Sort: Hardest first</option>
+                            <option value="ceiling">Sort: Highest skill ceiling</option>
+                            <option value="floor">Sort: Lowest skill floor</option>
+                            <option value="newest">Sort: Newest first</option>
+                        </select>
+                    </label>
+                </div>
+
+                <div class="filter-panel" id="filterPanel" hidden></div>
+                <div class="active-filters" id="activeFilters" hidden></div>
+            </section>
+
             <div class="groupbar" id="groupBar" role="group" aria-label="Group the roster by">
                 <span class="groupbar-label">Group by</span>
                 <button type="button" class="group-btn" data-group="role" aria-pressed="true">Role</button>
                 <button type="button" class="group-btn" data-group="playstyle" aria-pressed="false">Playstyle</button>
                 <button type="button" class="group-btn" data-group="difficulty" aria-pressed="false">Difficulty</button>
+                <button type="button" class="group-btn" data-group="none" aria-pressed="false">None</button>
             </div>
+
+            <p class="roster-count" id="rosterCount" role="status"></p>
 
             <div id="roster">
                 <p class="roster-status">Reading the archive</p>

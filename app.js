@@ -727,7 +727,87 @@ const GROUPS = {
         label: "Difficulty",
         key: (c) => c.difficulty,
         order: ["Easy", "Medium", "Hard"]
+    },
+    none: {
+        label: "None",
+        key: () => "All champions",
+        order: ["All champions"]
     }
+};
+
+
+// ============================================================
+// SEARCH, FILTERS AND SORTING
+// Everything here works on the roster already in memory, so it
+// is instant and never calls the API.
+// A champion is shown when it matches the search words AND, for every
+// filter that has something ticked, at least one of the ticked values.
+// ============================================================
+// "Fighter / Assassin" -> ["Fighter", "Assassin"]
+function splitMulti(value) {
+    return String(value || "").split("/").map((part) => part.trim()).filter(Boolean);
+}
+
+// Regions are compared without a leading "The", so "The Void" and "Void" are one place.
+function regionNames(value) {
+    return splitMulti(value).map((name) => name.replace(/^the\s+/i, ""));
+}
+
+const FILTERS = [
+    { id: "role",        label: "Role",      values: (c) => splitMulti(c.role),
+      order: ["Tank", "Fighter", "Assassin", "Mage", "Marksman", "Support"] },
+    { id: "playstyle",   label: "Playstyle", values: (c) => [c.playstyle],
+      order: ["Burst", "Sustained", "Poke", "Frontline", "Ambush", "Utility"] },
+    { id: "difficulty",  label: "Difficulty", values: (c) => [c.difficulty],
+      order: ["Easy", "Medium", "Hard"] },
+    { id: "attack_type", label: "Range",     values: (c) => [c.attack_type],
+      order: ["Melee", "Ranged"] },
+    { id: "damage_type", label: "Damage",    values: (c) => [c.damage_type],
+      order: ["AD", "AP", "Mixed"] },
+    { id: "mobility",    label: "Mobility",  values: (c) => [c.mobility],
+      order: ["High", "Medium", "Low"] },
+    { id: "region",      label: "Region",    values: (c) => regionNames(c.region), order: [] }
+];
+
+// Only the fields a champion could be searched on, joined into one lowercase line.
+function searchLine(character) {
+    return [
+        character.name, character.title, character.region, character.faction, character.origin,
+        character.race, character.role, character.playstyle, character.weapon
+    ].filter(Boolean).join(" ").toLowerCase();
+}
+
+let searchText = "";
+let sortBy = "name";
+const filters = Object.fromEntries(FILTERS.map((f) => [f.id, new Set()]));
+
+function activeFilterCount() {
+    return FILTERS.reduce((sum, f) => sum + filters[f.id].size, 0);
+}
+
+function passesFilters(character) {
+    const words = searchText.toLowerCase().split(/\s+/).filter(Boolean);
+    if (words.length) {
+        const line = searchLine(character);
+        if (!words.every((word) => line.includes(word))) return false;
+    }
+    return FILTERS.every((f) => {
+        const chosen = filters[f.id];
+        return chosen.size === 0 || f.values(character).some((value) => chosen.has(value));
+    });
+}
+
+const DIFFICULTY_RANK = { Easy: 0, Medium: 1, Hard: 2 };
+const byName = (a, b) => a.name.localeCompare(b.name);
+
+const SORTS = {
+    "name":      byName,
+    "name-desc": (a, b) => b.name.localeCompare(a.name),
+    "easiest":   (a, b) => (DIFFICULTY_RANK[a.difficulty] - DIFFICULTY_RANK[b.difficulty]) || (a.skill_floor - b.skill_floor) || byName(a, b),
+    "hardest":   (a, b) => (DIFFICULTY_RANK[b.difficulty] - DIFFICULTY_RANK[a.difficulty]) || (b.skill_floor - a.skill_floor) || byName(a, b),
+    "ceiling":   (a, b) => (b.skill_ceiling - a.skill_ceiling) || byName(a, b),
+    "floor":     (a, b) => (a.skill_floor - b.skill_floor) || byName(a, b),
+    "newest":    (a, b) => ((b.year_released || 0) - (a.year_released || 0)) || byName(a, b)
 };
 
 
@@ -742,6 +822,7 @@ let evidence = { answered: 0, total: QUESTIONS.length, share: 0 };
 let allCharacters = [];
 let groupBy = "role";
 let rosterPage = 1;
+let filterPanelBuilt = false;
 const ROSTER_PAGE_SIZE = 12;
 
 const el = {
@@ -753,6 +834,13 @@ const el = {
     groupBar:     document.getElementById("groupBar"),
     roster:       document.getElementById("roster"),
     pagination:   document.getElementById("pagination"),
+    search:       document.getElementById("rosterSearch"),
+    sort:         document.getElementById("rosterSort"),
+    filterToggle: document.getElementById("filterToggle"),
+    filterBadge:  document.getElementById("filterBadge"),
+    filterPanel:  document.getElementById("filterPanel"),
+    activeFilters: document.getElementById("activeFilters"),
+    rosterCount:  document.getElementById("rosterCount"),
     quiz:         document.getElementById("quizStage"),
     loading:      document.getElementById("loadingStage"),
     result:       document.getElementById("resultStage"),
@@ -1020,9 +1108,27 @@ function renderPagination(total, pages, start) {
 function renderRoster() {
     const group = GROUPS[groupBy];
 
+    // Only the champions that pass the search and the filters.
+    const pool = allCharacters.filter(passesFilters);
+    renderFilterSummary(pool.length);
+
+    if (pool.length === 0) {
+        el.roster.innerHTML = `
+            <div class="roster-empty">
+                <p>No champions match your search and filters.</p>
+                <button type="button" class="back" data-action="clear-filters">Clear search and filters</button>
+            </div>`;
+        el.pagination.hidden = true;
+        el.pagination.innerHTML = "";
+        el.groupBar.querySelectorAll(".group-btn").forEach((button) => {
+            button.setAttribute("aria-pressed", String(button.dataset.group === groupBy));
+        });
+        return;
+    }
+
     // Bucket the roster by the chosen category.
     const buckets = new Map();
-    for (const character of allCharacters) {
+    for (const character of pool) {
         const name = group.key(character);
         if (!buckets.has(name)) buckets.set(name, []);
         buckets.get(name).push(character);
@@ -1035,7 +1141,7 @@ function renderRoster() {
     // One flat list in display order, each champion knowing which group it belongs to.
     const flat = [];
     for (const name of [...known, ...extra]) {
-        const members = buckets.get(name).sort((a, b) => a.name.localeCompare(b.name));
+        const members = buckets.get(name).sort(SORTS[sortBy] || byName);
         members.forEach((character, i) => flat.push({ name, size: members.length, character, first: i === 0 }));
     }
 
@@ -1070,6 +1176,82 @@ function renderRoster() {
 }
 
 
+// ------------------------------------------------------------
+// The filter panel: one group of tick buttons per field, built from the roster.
+// ------------------------------------------------------------
+function buildFilterPanel() {
+    el.filterPanel.innerHTML = FILTERS.map((filter) => {
+        const counts = new Map();
+        for (const character of allCharacters) {
+            for (const value of new Set(filter.values(character))) {
+                if (value === undefined || value === null || value === "") continue;
+                counts.set(value, (counts.get(value) || 0) + 1);
+            }
+        }
+        // Known values in their set order, then any others (new regions, say) by size.
+        const known = filter.order.filter((v) => counts.has(v));
+        const extra = [...counts.keys()].filter((v) => !filter.order.includes(v))
+            .sort((a, b) => counts.get(b) - counts.get(a) || a.localeCompare(b));
+
+        return `
+            <fieldset class="filter-group">
+                <legend>${escapeHtml(filter.label)}</legend>
+                <div class="filter-chips">
+                    ${[...known, ...extra].map((value) => `
+                        <button type="button" class="fchip" data-filter="${filter.id}" data-value="${escapeHtml(value)}" aria-pressed="false">
+                            ${escapeHtml(value)} <b>${counts.get(value)}</b>
+                        </button>`).join("")}
+                </div>
+            </fieldset>`;
+    }).join("");
+    filterPanelBuilt = true;
+    syncFilterButtons();
+}
+
+function syncFilterButtons() {
+    el.filterPanel.querySelectorAll(".fchip").forEach((chip) => {
+        chip.setAttribute("aria-pressed", String(filters[chip.dataset.filter].has(chip.dataset.value)));
+    });
+}
+
+// The count, the badge on the Filters button and the removable tags of what is active.
+function renderFilterSummary(shown) {
+    const active = activeFilterCount();
+    el.filterBadge.textContent = active;
+    el.filterBadge.hidden = active === 0;
+
+    const tags = [];
+    for (const filter of FILTERS) {
+        for (const value of filters[filter.id]) {
+            tags.push(`
+                <button type="button" class="active-tag" data-filter="${filter.id}" data-value="${escapeHtml(value)}"
+                    aria-label="Remove the filter ${escapeHtml(filter.label)}: ${escapeHtml(value)}">
+                    <span>${escapeHtml(filter.label)}:</span> ${escapeHtml(value)} <i aria-hidden="true">&times;</i>
+                </button>`);
+        }
+    }
+    const searching = searchText.trim() !== "";
+    el.activeFilters.hidden = tags.length === 0 && !searching;
+    el.activeFilters.innerHTML = el.activeFilters.hidden ? "" : `
+        ${tags.join("")}
+        <button type="button" class="clear-all" data-action="clear-filters">Clear all</button>`;
+
+    const total = allCharacters.length;
+    el.rosterCount.textContent = (active || searching)
+        ? `${shown} of ${total} champions match`
+        : `${total} champions`;
+}
+
+function resetFilters() {
+    searchText = "";
+    el.search.value = "";
+    for (const filter of FILTERS) filters[filter.id].clear();
+    syncFilterButtons();
+    rosterPage = 1;
+    renderRoster();
+}
+
+
 async function showHome() {
     showStage("home");
     window.scrollTo({ top: 0 });
@@ -1077,6 +1259,7 @@ async function showHome() {
 
     try {
         await ensureRoster();
+        if (!filterPanelBuilt) buildFilterPanel();
         renderRoster();
     }
     catch (error) {
@@ -1099,6 +1282,44 @@ el.groupBar.addEventListener("click", (event) => {
     groupBy = button.dataset.group;
     rosterPage = 1;
     renderRoster();
+});
+
+// Searching: every key press filters the roster after a short pause.
+let searchTimer = 0;
+el.search.addEventListener("input", () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+        searchText = el.search.value;
+        rosterPage = 1;
+        renderRoster();
+    }, 120);
+});
+
+el.sort.addEventListener("change", () => {
+    sortBy = el.sort.value;
+    rosterPage = 1;
+    renderRoster();
+});
+
+el.filterToggle.addEventListener("click", () => {
+    const open = el.filterPanel.hidden;
+    el.filterPanel.hidden = !open;
+    el.filterToggle.setAttribute("aria-expanded", String(open));
+});
+
+// Ticking a value, removing an active tag, clearing everything.
+document.getElementById("homeStage").addEventListener("click", (event) => {
+    const chip = event.target.closest(".fchip, .active-tag");
+    if (chip) {
+        const set = filters[chip.dataset.filter];
+        if (set.has(chip.dataset.value)) set.delete(chip.dataset.value);
+        else set.add(chip.dataset.value);
+        syncFilterButtons();
+        rosterPage = 1;
+        renderRoster();
+        return;
+    }
+    if (event.target.closest("[data-action='clear-filters']")) resetFilters();
 });
 
 el.pagination.addEventListener("click", (event) => {
