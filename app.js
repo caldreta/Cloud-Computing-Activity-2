@@ -18,8 +18,10 @@ const DEBUG = false;
 
 // ============================================================
 // THE QUIZ
-// Each question feeds ONE field of the character data and is worth a
-// fixed number of `points`. All questions together are worth 100.
+// Each question feeds ONE field of the character data. `points` is how much
+// players tend to care about it, and all questions together add up to 100.
+// The weight a question really carries is a blend of that and how well it
+// tells the roster's champions apart (see WEIGHTS below).
 // `field` is the exact key on the character objects the API returns and
 // `value` is the exact string stored there, so scoring never needs a
 // translation step. `value: null` means "no preference": the question is
@@ -296,10 +298,67 @@ const MAX_RESULTS = 3;
 const MIN_LIST_SIZE = 3;
 
 // Champions with near-identical tags score almost the same, so one cluster of
-// look-alikes can fill the whole list. With this on, the real matches after
-// the #1 pick are taken from other playstyles first, and look-alikes of the
-// #1 only fill what is left. Set it to false for a plain ranking.
-const SPREAD_BY_PLAYSTYLE = true;
+// look-alikes can fill the whole list. To keep the list varied, a champion
+// loses this many percentage points for each champion with the same playstyle
+// that is already in the list. A look-alike only gives way when another
+// playstyle is within that many points, so a much better match is never
+// pushed down for variety. Set it to 0 for a plain ranking.
+const DIVERSITY_PENALTY = 4;
+
+// ============================================================
+// WEIGHTS
+// A question that splits the roster into evenly sized groups tells champions
+// apart well. One where nearly everyone gives the same answer tells them
+// apart poorly. INFORMATION_SHARE is how much of each question's weight comes
+// from that (the rest is `points`, how much players care). It is worked out
+// from the roster when it loads, so adding champions keeps it fair. 0 uses
+// `points` alone. Questions are measured by the entropy of their field.
+// ============================================================
+const INFORMATION_SHARE = 0.5;
+const MIN_ROSTER_FOR_WEIGHTS = 12;   // with fewer champions, the numbers would only be noise
+
+let weights = {};
+
+function weightOf(question) {
+    return weights[question.id] ?? question.points;
+}
+
+// The value a champion has for a question (a role question looks at the main role).
+function answerValue(question, character) {
+    const value = character[question.field];
+    if (value === undefined || value === null) return undefined;
+    return question.field === "role" ? String(value).split("/")[0].trim() : value;
+}
+
+function computeWeights(characters) {
+    weights = {};
+    if (INFORMATION_SHARE <= 0 || characters.length < MIN_ROSTER_FOR_WEIGHTS) return;
+
+    const entropy = {};
+    for (const question of QUESTIONS) {
+        const counts = new Map();
+        let total = 0;
+        for (const character of characters) {
+            const value = answerValue(question, character);
+            if (value === undefined) continue;
+            counts.set(value, (counts.get(value) || 0) + 1);
+            total++;
+        }
+        if (total === 0) continue;
+        entropy[question.id] = -[...counts.values()].reduce((sum, n) => sum + (n / total) * Math.log2(n / total), 0);
+    }
+
+    const sumEntropy = Object.values(entropy).reduce((a, b) => a + b, 0);
+    const sumPoints = QUESTIONS.reduce((sum, q) => sum + q.points, 0);
+    if (!sumEntropy) return;
+
+    for (const question of QUESTIONS) {
+        if (entropy[question.id] === undefined) continue;
+        weights[question.id] =
+            INFORMATION_SHARE * 100 * (entropy[question.id] / sumEntropy) +
+            (1 - INFORMATION_SHARE) * 100 * (question.points / sumPoints);
+    }
+}
 
 // One line per field value, shown when a champion matches that answer.
 const REASONS = {
@@ -447,9 +506,10 @@ function tally(character, answers) {
         if (character[question.field] === undefined) continue;
 
         const credit = closeness(question.field, character, clicked);
-        points += question.points * credit;
-        available += question.points;
-        parts.push({ question, clicked, credit });
+        const weight = weightOf(question);
+        points += weight * credit;
+        available += weight;
+        parts.push({ question, clicked, credit, weight });
     }
 
     return { points, available, parts };
@@ -507,6 +567,29 @@ function thresholdFor(character) {
 }
 
 
+// Short names for the fields, used when saying where a champion differs.
+const FIELD_LABELS = {
+    playstyle: "Playstyle", role: "Role", skill_floor: "Learning curve", skill_ceiling: "Room to grow",
+    attack_type: "Attack range", damage_source: "Damage source", damage_type: "Damage type",
+    mobility: "Mobility", survivability: "Staying alive", mechanical_demand: "Aiming",
+    kit_complexity: "Ability synergy", power_curve: "Power curve", snowball_dependence: "Falling behind",
+    team_dependence: "Teamwork"
+};
+
+// Below this, an answer counts as a clear miss and is listed under "Where it differs".
+const GAP_BELOW = 0.5;
+const MAX_GAPS = 3;
+
+function gapFor(field, character, clicked) {
+    const label = FIELD_LABELS[field] || field;
+    if (field === "role") {
+        return `${label}: plays ${String(character.role).toLowerCase()}, not the ${String(clicked).toLowerCase()} role you picked.`;
+    }
+    const text = REASONS[field] && REASONS[field][character[field]];
+    return text ? `${label}: ${text}` : null;
+}
+
+
 function reasonFor(field, character, clicked, credit) {
     if (field === "role") {
         if (credit === 0) return null;
@@ -532,12 +615,20 @@ function scoreCharacter(character, answers) {
 
     // Heaviest questions first, no repeated lines (difficulty has two).
     const found = parts
-        .map(({ question, clicked, credit }) => ({
-            weight: question.points,
+        .map(({ question, clicked, credit, weight }) => ({
+            weight,
             text: reasonFor(question.field, character, clicked, credit)
         }))
         .filter((item) => item.text)
         .sort((a, b) => b.weight - a.weight);
+
+    // The clearest misses, heaviest first, so a result never hides where it falls short.
+    const gaps = parts
+        .filter(({ credit }) => credit < GAP_BELOW)
+        .sort((a, b) => b.weight - a.weight)
+        .map(({ question, clicked }) => gapFor(question.field, character, clicked))
+        .filter(Boolean)
+        .slice(0, MAX_GAPS);
 
     const reasons = [];
     for (const item of found) {
@@ -553,7 +644,8 @@ function scoreCharacter(character, answers) {
         match_percent: matchPercent,
         threshold,
         qualifies: matchPercent >= threshold,
-        reasons
+        reasons,
+        gaps
     };
 }
 
@@ -569,6 +661,48 @@ function rankCharacters(allCharacters, answers) {
             DIFFICULTY_ORDER[a.difficulty] - DIFFICULTY_ORDER[b.difficulty] ||
             a.name.localeCompare(b.name)
         );
+}
+
+
+// Which champions to show. The best match always comes first, and the others
+// are chosen in score order with a small nudge towards other playstyles (see
+// DIVERSITY_PENALTY). The final list is shown in true score order, so a higher
+// percentage never sits below a lower one.
+function selectResults(allCharacters, answers) {
+    const ranked = rankCharacters(allCharacters, answers);
+    const pool = ranked.filter((c) => c.qualifies);
+    const picked = [];
+
+    while (picked.length < MAX_RESULTS && pool.length) {
+        let bestIndex = 0;
+        let bestScore = -Infinity;
+        pool.forEach((candidate, i) => {
+            const alike = picked.filter((p) => p.playstyle === candidate.playstyle).length;
+            const adjusted = candidate.percent - DIVERSITY_PENALTY * alike;
+            if (adjusted > bestScore + 1e-9) {
+                bestScore = adjusted;
+                bestIndex = i;
+            }
+        });
+        picked.push(pool.splice(bestIndex, 1)[0]);
+    }
+
+    const order = new Map(ranked.map((c, i) => [c.id, i]));
+    picked.sort((a, b) => order.get(a.id) - order.get(b.id));
+
+    // Too few real matches to fill the list? Add the next closest.
+    const fill = ranked
+        .filter((c) => !c.qualifies)
+        .slice(0, Math.max(0, MIN_LIST_SIZE - picked.length));
+
+    // How much of the quiz the answers covered, so the page can say how firm the match is.
+    const totalWeight = QUESTIONS.reduce((sum, q) => sum + weightOf(q), 0);
+    const answered = QUESTIONS.filter((q) => answers[q.id] !== null && answers[q.id] !== undefined).length;
+    const evidence = ranked.length
+        ? { answered, total: QUESTIONS.length, share: ranked[0].available / totalWeight }
+        : { answered, total: QUESTIONS.length, share: 0 };
+
+    return { ranked, matches: picked, shown: [...picked, ...fill], fallback: picked.length === 0, evidence };
 }
 
 
@@ -604,6 +738,7 @@ let step = 0;
 let answers = {};      // { questionId: value }
 let results = [];
 let resultsAreFallback = false;
+let evidence = { answered: 0, total: QUESTIONS.length, share: 0 };
 let allCharacters = [];
 let groupBy = "role";
 
@@ -664,6 +799,7 @@ async function loadCharacters() {
     }
 
     checkRosterFields(allCharacters);
+    computeWeights(allCharacters);
     thresholds = calibrateThresholds(allCharacters);
 
     if (DEBUG) {
@@ -730,7 +866,23 @@ function checkRosterFields(characters) {
     el.dataWarning.hidden = problems.length === 0;
 }
 
-let rosterReady = loadCharacters();
+// The small light in the top bar: is the archive answering?
+function setStatus(state, text) {
+    const light = document.getElementById("apiStatus");
+    if (!light) return;
+    light.dataset.state = state;
+    light.querySelector(".status-text").textContent = text;
+}
+
+function trackStatus(promise) {
+    promise.then(
+        () => setStatus("ok", "Archive online"),
+        () => setStatus("error", "Archive unreachable")
+    );
+    return promise;
+}
+
+let rosterReady = trackStatus(loadCharacters());
 rosterReady.catch((error) => console.error(error));
 
 // Usually already resolved. If the first load failed, try once more.
@@ -738,29 +890,27 @@ async function ensureRoster() {
     try {
         await rosterReady;
     } catch (firstAttempt) {
-        rosterReady = loadCharacters();
+        setStatus("loading", "Connecting");
+        rosterReady = trackStatus(loadCharacters());
         await rosterReady;
     }
 }
 
 
 // ============================================================
-// REGION -> ACCENT COLOR  (same mapping as the character archive)
+// REGION -> ACCENT COLOR  (same mapping as the Codex of Champions)
 // ============================================================
+const REGION_COLORS = [
+    ["ionia", "ionia"], ["noxus", "noxus"], ["freljord", "freljord"], ["targon", "targon"],
+    ["celestial", "targon"], ["shurima", "shurima"], ["void", "void"], ["zaun", "zaun"],
+    ["bandle", "bandle"], ["spirit", "bandle"], ["demacia", "demacia"], ["piltover", "piltover"],
+    ["bilgewater", "bilgewater"], ["shadow", "shadow"], ["camavor", "shadow"]
+];
+
 function getRegionColor(region) {
-    if (!region) return "var(--region-default)";
-    const r = region.toLowerCase();
-
-    if (r.includes("ionia")) return "var(--region-ionia)";
-    if (r.includes("noxus")) return "var(--region-noxus)";
-    if (r.includes("freljord")) return "var(--region-freljord)";
-    if (r.includes("targon")) return "var(--region-targon)";
-    if (r.includes("shurima")) return "var(--region-shurima)";
-    if (r.includes("void")) return "var(--region-void)";
-    if (r.includes("zaun")) return "var(--region-zaun)";
-    if (r.includes("bandle") || r.includes("spirit")) return "var(--region-bandle)";
-
-    return "var(--region-default)";
+    const r = String(region || "").toLowerCase();
+    const hit = REGION_COLORS.find(([needle]) => r.includes(needle));
+    return `var(--region-${hit ? hit[1] : "default"})`;
 }
 
 
@@ -787,26 +937,32 @@ function pips(field, value) {
 }
 
 
-function rosterCard(character) {
+function rosterCard(character, index) {
+    const initial = escapeHtml((character.name || "?")[0]);
     const image = character.image
-        ? `<img class="roster-thumb" src="${IMAGE_BASE}${escapeHtml(character.image)}" alt="">`
-        : `<div class="roster-thumb"></div>`;
+        ? `<img src="${IMAGE_BASE}${escapeHtml(character.image)}" alt="" loading="lazy" onerror="this.remove()">`
+        : "";
 
     return `
-        <article class="roster-card" style="--accent: ${getRegionColor(character.region)}">
-            ${image}
-            <div>
+        <article class="roster-card" style="--accent: ${getRegionColor(character.region)}; --i: ${index}">
+            <span class="bracket tl"></span><span class="bracket tr"></span>
+            <span class="bracket bl"></span><span class="bracket br"></span>
+            <div class="roster-art" data-initial="${initial}">
+                ${image}
+                <span class="roster-region">${escapeHtml(character.region || "Unknown")}</span>
+            </div>
+            <div class="roster-body">
                 <h4 class="roster-name">${escapeHtml(character.name)}</h4>
                 <p class="roster-title">${escapeHtml(character.title)}</p>
+                <dl class="roster-facts">
+                    <div><dt>Role</dt><dd>${escapeHtml(character.role)}</dd></div>
+                    <div><dt>Playstyle</dt><dd>${escapeHtml(character.playstyle)}</dd></div>
+                    <div><dt>Difficulty</dt><dd>${pips("difficulty", character.difficulty)}${escapeHtml(character.difficulty)}</dd></div>
+                    <div><dt>Mobility</dt><dd>${pips("mobility", character.mobility)}${escapeHtml(character.mobility)}</dd></div>
+                    <div><dt>Skill floor</dt><dd>${pips("skill_floor", character.skill_floor)}${escapeHtml(character.skill_floor ?? "\u2014")}</dd></div>
+                    <div><dt>Skill ceiling</dt><dd>${pips("skill_ceiling", character.skill_ceiling)}${escapeHtml(character.skill_ceiling ?? "\u2014")}</dd></div>
+                </dl>
             </div>
-            <dl class="roster-facts">
-                <div><dt>Role</dt><dd>${escapeHtml(character.role)}</dd></div>
-                <div><dt>Playstyle</dt><dd>${escapeHtml(character.playstyle)}</dd></div>
-                <div><dt>Difficulty</dt><dd>${pips("difficulty", character.difficulty)}${escapeHtml(character.difficulty)}</dd></div>
-                <div><dt>Mobility</dt><dd>${pips("mobility", character.mobility)}${escapeHtml(character.mobility)}</dd></div>
-                <div><dt>Skill floor</dt><dd>${pips("skill_floor", character.skill_floor)}${escapeHtml(character.skill_floor ?? "—")}</dd></div>
-                <div><dt>Skill ceiling</dt><dd>${pips("skill_ceiling", character.skill_ceiling)}${escapeHtml(character.skill_ceiling ?? "—")}</dd></div>
-            </dl>
         </article>
     `;
 }
@@ -831,7 +987,7 @@ function renderRoster() {
         const members = buckets.get(name).sort((a, b) => a.name.localeCompare(b.name));
         return `
             <section class="roster-group">
-                <h3 class="roster-group-title">${escapeHtml(name)} <span class="count">${members.length}</span></h3>
+                <h3 class="roster-group-title"><span>${escapeHtml(name)}</span><span class="count">${members.length}</span></h3>
                 <div class="roster-grid">${members.map(rosterCard).join("")}</div>
             </section>
         `;
@@ -902,10 +1058,13 @@ function renderQuestion() {
 
     el.answers.innerHTML = question.options
         .map((option, i) => `
-            <button class="plate ${option.skip ? "plate-skip" : ""}" data-option="${i}">
-                <span class="glyph" aria-hidden="true">${option.glyph ?? ROMAN[i]}</span>
-                <span class="plate-label">${escapeHtml(option.label)}</span>
-                ${option.sub ? `<span class="plate-sub">${escapeHtml(option.sub)}</span>` : ""}
+            <button type="button" class="plate ${option.skip ? "plate-skip" : ""}" data-option="${i}" style="--i: ${i}">
+                <span class="glyph" aria-hidden="true"><span>${escapeHtml(option.glyph ?? ROMAN[i])}</span></span>
+                <span class="plate-text">
+                    <span class="plate-label">${escapeHtml(option.label)}</span>
+                    ${option.sub ? `<span class="plate-sub">${escapeHtml(option.sub)}</span>` : ""}
+                </span>
+                <kbd class="plate-key" aria-hidden="true">${i + 1}</kbd>
             </button>
         `)
         .join("");
@@ -934,6 +1093,22 @@ el.answers.addEventListener("click", (event) => {
     }
 });
 
+// Number keys pick an answer and Backspace goes back, while a question is showing.
+document.addEventListener("keydown", (event) => {
+    if (el.rite.dataset.stage !== "quiz" || event.ctrlKey || event.metaKey || event.altKey) return;
+
+    if (/^[1-9]$/.test(event.key)) {
+        const plate = el.answers.querySelectorAll(".plate")[Number(event.key) - 1];
+        if (plate) {
+            event.preventDefault();
+            plate.click();
+        }
+    } else if (event.key === "Backspace") {
+        event.preventDefault();
+        el.backBtn.click();
+    }
+});
+
 el.backBtn.addEventListener("click", () => {
     if (step === 0) {
         showHome();
@@ -959,27 +1134,12 @@ async function finish() {
     try {
         await ensureRoster();
 
-        const ranked = rankCharacters(allCharacters, answers);
-        let real = ranked.filter((c) => c.qualifies);
+        const selection = selectResults(allCharacters, answers);
+        const ranked = selection.ranked;
 
-        if (SPREAD_BY_PLAYSTYLE && real.length > 1) {
-            const [best, ...others] = real;
-            real = [
-                best,
-                ...others.filter((c) => c.playstyle !== best.playstyle),
-                ...others.filter((c) => c.playstyle === best.playstyle)
-            ];
-        }
-
-        const matches = real.slice(0, MAX_RESULTS);
-
-        // Too few real matches to fill the list? Add the next closest.
-        const fill = ranked
-            .filter((c) => !c.qualifies)
-            .slice(0, Math.max(0, MIN_LIST_SIZE - matches.length));
-
-        resultsAreFallback = matches.length === 0;
-        results = [...matches, ...fill];
+        resultsAreFallback = selection.fallback;
+        results = selection.shown;
+        evidence = selection.evidence;
 
         if (DEBUG) {
             console.table(ranked.map((c) => ({
@@ -1008,6 +1168,22 @@ async function finish() {
 // `index` is which of the results is being shown, so clicking an
 // alternate re-renders the same view for that champion.
 // ============================================================
+// A hexagon outline that fills clockwise up to the match percentage.
+function matchRingHtml(percent) {
+    const hex = "M43.3 0 L86.6 25 L86.6 75 L43.3 100 L0 75 L0 25 Z";
+    const fill = Math.max(0, Math.min(100, percent));
+    return `
+        <span class="match-ring" role="img" aria-label="${percent} percent match">
+            <svg viewBox="-6 -6 98.6 112" aria-hidden="true" focusable="false">
+                <path class="ring-fill" d="${hex}"/>
+                <path class="ring-track" d="${hex}"/>
+                <path class="ring-bar" d="${hex}" pathLength="100" stroke-dasharray="${fill} 100"/>
+            </svg>
+            <span class="match-figure">${percent}<span class="pct">%</span></span>
+        </span>`;
+}
+
+
 function renderResult(index) {
     const character = results[index];
     const accent = getRegionColor(character.region);
@@ -1025,23 +1201,31 @@ function renderResult(index) {
         value === undefined ? "" : `<span class="trait">${label} ${escapeHtml(value)} of 5</span>`;
 
     const portrait = character.image
-        ? `<img src="${IMAGE_BASE}${escapeHtml(character.image)}" alt="${escapeHtml(character.name)}">`
+        ? `<img src="${IMAGE_BASE}${escapeHtml(character.image)}" alt="${escapeHtml(character.name)}" onerror="this.remove()">`
         : "";
 
     const reasons = character.reasons.length
         ? character.reasons.map((r) => `<li>${escapeHtml(r)}</li>`).join("")
         : `<li class="reasons-empty">Nothing you asked for lines up exactly, so this is the closest the roster has.</li>`;
 
+    // How much of the quiz this match rests on.
+    const thin = evidence.share < 0.6;
+    const evidenceLine = `Based on <b>${evidence.answered} of ${evidence.total}</b> questions.${
+        thin ? " You skipped a lot, so answer more for a sharper match." : ""}`;
+
+    const gaps = (character.gaps || []).map((g) => `<li>${escapeHtml(g)}</li>`).join("");
+
     el.reveal.innerHTML = `
         <div class="reveal-top">
-            <div class="portrait">${portrait}</div>
-            <div>
+            <div class="portrait"><div data-initial="${escapeHtml((character.name || "?")[0])}">${portrait}</div></div>
+            <div class="reveal-head">
                 <div class="match">
-                    <span class="match-figure">${character.match_percent}<span class="pct">%</span></span>
-                    <span class="match-label">match with your answers</span>
+                    ${matchRingHtml(character.match_percent)}
+                    <span class="match-label">match with<br>your answers</span>
                 </div>
                 <h2 class="champion-name">${escapeHtml(character.name)}</h2>
                 <p class="champion-title">${escapeHtml(character.title)}</p>
+                <p class="evidence">${evidenceLine}</p>
             </div>
         </div>
 
@@ -1054,7 +1238,17 @@ function renderResult(index) {
             <span class="trait">${escapeHtml(character.region)}</span>
         </div>
 
-        <ul class="reasons">${reasons}</ul>
+        <div class="reveal-cols">
+            <section class="panel panel-fit" style="--i: 0">
+                <h3>Why it fits</h3>
+                <ul class="reasons">${reasons}</ul>
+            </section>
+            ${gaps ? `
+            <section class="panel panel-gap" style="--i: 1">
+                <h3>Where it differs</h3>
+                <ul class="gaps">${gaps}</ul>
+            </section>` : ""}
+        </div>
 
         <div class="reveal-lore">
             <h3 class="blurb-heading">Who you would be playing</h3>
@@ -1079,9 +1273,9 @@ function renderAlternates(shownIndex) {
         return;
     }
 
-    const row = ({ character, i }) => `
-        <button class="alt" data-index="${i}">
-            <img class="alt-thumb" src="${IMAGE_BASE}${escapeHtml(character.image)}" alt="">
+    const row = ({ character, i }, n) => `
+        <button type="button" class="alt" data-index="${i}" style="--accent: ${getRegionColor(character.region)}; --i: ${n + 2}">
+            <span class="alt-thumb">${character.image ? `<img src="${IMAGE_BASE}${escapeHtml(character.image)}" alt="" onerror="this.remove()">` : ""}</span>
             <span>
                 <span class="alt-name">${escapeHtml(character.name)}</span><br>
                 <span class="alt-meta">${escapeHtml(character.playstyle)} &middot; ${escapeHtml(character.role)}</span>

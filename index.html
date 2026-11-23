@@ -4,19 +4,35 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Which champion should you play?</title>
+    <meta name="description" content="Answer a short quiz about how you like to fight, and the archive names the champions that fit you best.">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=Barlow:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Spline+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
+    <a class="skip-link" href="#rite">Skip to the content</a>
+
+    <header class="topbar">
+        <div class="topbar-inner">
+            <span class="brand">
+                <span class="brand-mark" aria-hidden="true"></span>
+                <span class="brand-name">Champion Finder</span>
+            </span>
+            <span class="status" id="apiStatus" data-state="loading" role="status">
+                <span class="status-dot" aria-hidden="true"></span><span class="status-text">Connecting</span>
+            </span>
+        </div>
+    </header>
+
     <main class="rite" id="rite" data-stage="home">
 
         <header class="masthead">
-            <h1>Which champion should you play?</h1>
+            <p class="eyebrow">Find the one that fits how you fight</p>
+            <h1>Which champion <span>should you play?</span></h1>
             <p class="standfirst" id="standfirst">
                 Look over the roster, then answer a short quiz about how you like
                 to fight. We read the archive and name the champions that fit.
@@ -30,15 +46,15 @@
             <p class="notice" id="dataWarning" hidden></p>
 
             <div class="home-actions">
-                <button class="cta" data-action="start-quiz">Find my champion</button>
+                <button type="button" class="cta" data-action="start-quiz">Find my champion</button>
                 <span class="home-hint" id="quizMeta"></span>
             </div>
 
             <div class="groupbar" id="groupBar" role="group" aria-label="Group the roster by">
                 <span class="groupbar-label">Group by</span>
-                <button class="group-btn" data-group="role" aria-pressed="true">Role</button>
-                <button class="group-btn" data-group="playstyle" aria-pressed="false">Playstyle</button>
-                <button class="group-btn" data-group="difficulty" aria-pressed="false">Difficulty</button>
+                <button type="button" class="group-btn" data-group="role" aria-pressed="true">Role</button>
+                <button type="button" class="group-btn" data-group="playstyle" aria-pressed="false">Playstyle</button>
+                <button type="button" class="group-btn" data-group="difficulty" aria-pressed="false">Difficulty</button>
             </div>
 
             <div id="roster">
@@ -46,7 +62,7 @@
             </div>
 
             <div class="home-actions home-actions-end">
-                <button class="cta" data-action="start-quiz">Find my champion</button>
+                <button type="button" class="cta" data-action="start-quiz">Find my champion</button>
             </div>
 
         </section>
@@ -63,7 +79,10 @@
 
             <div class="answers" id="answers"></div>
 
-            <button class="back" id="backBtn">Back to the roster</button>
+            <div class="quiz-foot">
+                <button type="button" class="back" id="backBtn">Back to the roster</button>
+                <span class="key-hint">Press a number to answer</span>
+            </div>
 
         </section>
 
@@ -88,8 +107,8 @@
             <div class="alternates" id="alternates"></div>
 
             <div class="result-actions">
-                <button class="restart" id="restartBtn">Answer again</button>
-                <button class="back" id="homeBtn">Back to the roster</button>
+                <button type="button" class="restart" id="restartBtn">Answer again</button>
+                <button type="button" class="back" id="homeBtn">Back to the roster</button>
             </div>
 
         </section>
@@ -99,10 +118,14 @@
         <section class="stage stage-center" id="errorStage" hidden>
             <h2 class="question">The archive did not answer</h2>
             <p class="question-note" id="errorText"></p>
-            <button class="restart" id="retryBtn">Try again</button>
+            <button type="button" class="restart" id="retryBtn">Try again</button>
         </section>
 
     </main>
+
+    <footer class="footer">
+        <p>Matches are drawn from the Champion Archive</p>
+    </footer>
 
     <script src="app.js"></script>
 </body>

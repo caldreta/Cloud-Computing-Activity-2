@@ -89,6 +89,7 @@ Each question corresponds to one or more champion attributes provided by the API
 The questions are weighted differently because some characteristics are considered more important to the recommendation than others.
 For example, playstyle and role can have greater influence on the final result than less important characteristics.
 This prevents every question from having exactly the same influence on the final recommendation.
+The weights are explained in section 24.
 
 8. SCORING SYSTEM
 Each champion receives points based on how well it matches the user's answers.
@@ -176,6 +177,9 @@ The ranking primarily considers:
 3. Alphabetical order
 The strongest qualifying champions are placed at the top.
 The system normally displays the top three qualifying champions.
+To keep the list varied, a champion loses 4 percentage points for each champion of the same playstyle that is already in the list.
+A look-alike only gives way when a champion with another playstyle is within those 4 points, so a much better match is never pushed down for variety.
+The chosen champions are always shown in true score order, so a higher percentage never appears below a lower one.
 
 17. FALLBACK RECOMMENDATIONS
 There may be cases where no champion reaches the qualification threshold.
@@ -305,3 +309,19 @@ The system then:
 10. Displays the top recommendations.
 In short:
 The API provides the champion data. The quiz provides the user's preferences. The recommendation engine combines both to determine which champions best fit the user.
+
+24. HOW THE QUESTION WEIGHTS ARE SET
+Each question has a base weight that says how much players tend to care about it. The base weights add up to 100.
+The weight a question really carries is half of that base weight and half of how well the question separates the champions in the roster.
+A question where champions split into evenly sized groups, such as skill floor, tells champions apart well.
+A question where nearly everyone falls in one group tells them apart poorly.
+This is measured as the entropy of the field and is worked out from the roster when it loads, so adding champions keeps the weights fair.
+The same random quiz simulations that calibrate the thresholds then run with these weights.
+In a test that answers the quiz as each real champion with some answers wrong, this blend found the right champion more often than the base weights alone.
+The setting is INFORMATION_SHARE in app.js. Setting it to 0 uses only the base weights.
+
+25. WHAT THE RESULT SHOWS
+The result page does not only say why a champion fits. It also shows where it differs, listing up to three clear misses such as a role or range the user did not pick.
+It says how many of the questions the match is based on. If most were skipped, it suggests answering more for a sharper match.
+The percentage is shown inside a hexagon that fills up to that percentage.
+
