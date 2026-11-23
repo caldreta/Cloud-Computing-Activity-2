@@ -590,6 +590,86 @@ button { font-family: inherit; }
 
 
 /* ============================================================
+   PAGINATION
+   ============================================================ */
+.continued {
+    color: var(--muted);
+    font: 600 .72rem var(--font-body);
+    letter-spacing: .16em;
+    text-transform: uppercase;
+}
+
+.pagination {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px 24px;
+    margin-top: 1rem;
+    padding-top: 1.4rem;
+    border-top: 1px solid var(--line);
+}
+
+.page-summary {
+    margin: 0;
+    color: var(--muted);
+    font-size: .8rem;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+}
+
+.page-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .5rem;
+}
+
+.page-btn {
+    min-width: 2.7rem;
+    padding: .55rem .9rem;
+    color: var(--muted);
+    font: 600 .88rem var(--font-body);
+    cursor: pointer;
+    background: rgba(15, 28, 51, .7);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    transition: color .2s, border-color .2s, background .2s, transform .2s;
+}
+
+.page-btn:hover:not(:disabled) {
+    color: var(--gold-hi);
+    border-color: var(--gold);
+    transform: translateY(-2px);
+}
+
+.page-btn[aria-current="page"] {
+    color: #1a1306;
+    background: linear-gradient(180deg, #ecd9a8, #c8aa6e 55%, #9a7a3c);
+    border-color: rgba(240, 230, 210, .55);
+    box-shadow: 0 0 18px rgba(200, 170, 110, .35);
+}
+
+.page-btn:disabled {
+    opacity: .35;
+    cursor: not-allowed;
+}
+
+.page-gap {
+    padding: 0 .2rem;
+    color: var(--muted);
+}
+
+.page-of {
+    display: none;
+    color: var(--muted);
+    font-size: .8rem;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+}
+
+
+/* ============================================================
    QUIZ
    ============================================================ */
 .progress {
@@ -1178,4 +1258,7 @@ button { font-family: inherit; }
     .home-actions .cta { width: 100%; }
     .plate-key { display: none; }
     .plate { padding-right: 1rem; }
+    .pagination { justify-content: center; text-align: center; }
+    .page-num, .page-gap { display: none; }
+    .page-of { display: inline; }
 }

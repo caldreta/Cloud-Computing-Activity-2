@@ -741,6 +741,8 @@ let resultsAreFallback = false;
 let evidence = { answered: 0, total: QUESTIONS.length, share: 0 };
 let allCharacters = [];
 let groupBy = "role";
+let rosterPage = 1;
+const ROSTER_PAGE_SIZE = 12;
 
 const el = {
     rite:         document.getElementById("rite"),
@@ -750,6 +752,7 @@ const el = {
     dataWarning:  document.getElementById("dataWarning"),
     groupBar:     document.getElementById("groupBar"),
     roster:       document.getElementById("roster"),
+    pagination:   document.getElementById("pagination"),
     quiz:         document.getElementById("quizStage"),
     loading:      document.getElementById("loadingStage"),
     result:       document.getElementById("resultStage"),
@@ -968,6 +971,52 @@ function rosterCard(character, index) {
 }
 
 
+// Page numbers to show: the first, the last, and the pages around the current one, with gaps as "..."
+function pageWindow(current, pages) {
+    const wanted = new Set([1, pages, current - 1, current, current + 1]);
+    const numbers = [...wanted].filter((n) => n >= 1 && n <= pages).sort((a, b) => a - b);
+    const out = [];
+    numbers.forEach((n, i) => {
+        if (i > 0 && n - numbers[i - 1] > 1) out.push("gap");
+        out.push(n);
+    });
+    return out;
+}
+
+
+function renderPagination(total, pages, start) {
+    const nav = el.pagination;
+    if (total <= ROSTER_PAGE_SIZE) {
+        nav.hidden = true;
+        nav.innerHTML = "";
+        return;
+    }
+    const first = start + 1;
+    const last = Math.min(start + ROSTER_PAGE_SIZE, total);
+
+    const numbers = pageWindow(rosterPage, pages).map((item) => (
+        item === "gap"
+            ? `<span class="page-gap" aria-hidden="true">&hellip;</span>`
+            : `<button type="button" class="page-btn page-num" data-page="${item}"
+                   ${item === rosterPage ? 'aria-current="page"' : ""} aria-label="Page ${item}">${item}</button>`
+    )).join("");
+
+    nav.hidden = false;
+    nav.innerHTML = `
+        <p class="page-summary" role="status">Showing ${first}&ndash;${last} of ${total} champions</p>
+        <div class="page-buttons">
+            <button type="button" class="page-btn" data-page="${rosterPage - 1}" ${rosterPage === 1 ? "disabled" : ""}
+                aria-label="Previous page">&lsaquo; Prev</button>
+            ${numbers}
+            <span class="page-of">Page ${rosterPage} of ${pages}</span>
+            <button type="button" class="page-btn" data-page="${rosterPage + 1}" ${rosterPage === pages ? "disabled" : ""}
+                aria-label="Next page">Next &rsaquo;</button>
+        </div>`;
+}
+
+
+// The roster is grouped, then cut into pages. A group that runs over the end of a page
+// carries on at the top of the next one, marked "continued".
 function renderRoster() {
     const group = GROUPS[groupBy];
 
@@ -983,15 +1032,37 @@ function renderRoster() {
     const known = group.order.filter((name) => buckets.has(name));
     const extra = [...buckets.keys()].filter((name) => !group.order.includes(name)).sort();
 
-    el.roster.innerHTML = [...known, ...extra].map((name) => {
+    // One flat list in display order, each champion knowing which group it belongs to.
+    const flat = [];
+    for (const name of [...known, ...extra]) {
         const members = buckets.get(name).sort((a, b) => a.name.localeCompare(b.name));
-        return `
-            <section class="roster-group">
-                <h3 class="roster-group-title"><span>${escapeHtml(name)}</span><span class="count">${members.length}</span></h3>
-                <div class="roster-grid">${members.map(rosterCard).join("")}</div>
-            </section>
-        `;
-    }).join("");
+        members.forEach((character, i) => flat.push({ name, size: members.length, character, first: i === 0 }));
+    }
+
+    const pages = Math.max(1, Math.ceil(flat.length / ROSTER_PAGE_SIZE));
+    rosterPage = Math.min(Math.max(1, rosterPage), pages);
+    const start = (rosterPage - 1) * ROSTER_PAGE_SIZE;
+    const slice = flat.slice(start, start + ROSTER_PAGE_SIZE);
+
+    // Back into runs of the same group, in order.
+    const runs = [];
+    for (const entry of slice) {
+        const last = runs[runs.length - 1];
+        if (last && last.name === entry.name) last.entries.push(entry);
+        else runs.push({ name: entry.name, size: entry.size, continued: !entry.first, entries: [entry] });
+    }
+
+    el.roster.innerHTML = runs.map((run) => `
+        <section class="roster-group">
+            <h3 class="roster-group-title">
+                <span>${escapeHtml(run.name)}</span><span class="count">${run.size}</span>
+                ${run.continued ? `<span class="continued">continued</span>` : ""}
+            </h3>
+            <div class="roster-grid">${run.entries.map((entry, i) => rosterCard(entry.character, i)).join("")}</div>
+        </section>
+    `).join("");
+
+    renderPagination(flat.length, pages, start);
 
     el.groupBar.querySelectorAll(".group-btn").forEach((button) => {
         button.setAttribute("aria-pressed", String(button.dataset.group === groupBy));
@@ -1010,6 +1081,7 @@ async function showHome() {
     }
     catch (error) {
         console.error(error);
+        el.pagination.hidden = true;
         el.roster.innerHTML = `
             <p class="roster-status">
                 ${escapeHtml(error.message)} Check that the API is running and that the key is correct.
@@ -1025,7 +1097,20 @@ el.groupBar.addEventListener("click", (event) => {
     if (!button || !allCharacters.length) return;
 
     groupBy = button.dataset.group;
+    rosterPage = 1;
     renderRoster();
+});
+
+el.pagination.addEventListener("click", (event) => {
+    const button = event.target.closest(".page-btn");
+    if (!button || button.disabled) return;
+
+    rosterPage = Number(button.dataset.page);
+    renderRoster();
+
+    // back up to the top of the roster, not the top of the page
+    const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    el.groupBar.scrollIntoView({ behavior: calm ? "auto" : "smooth", block: "start" });
 });
 
 el.roster.addEventListener("click", (event) => {
